@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Starry Night & The Little Red Fox</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Three.js and OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <!-- Google Fonts for artistic typography -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Quicksand:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+    }
+    body, html {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #050a18;
+      font-family: 'Quicksand', sans-serif;
+      color: #e2e8f0;
+    }
+    .font-cinzel {
+      font-family: 'Cinzel', serif;
+    }
+    #canvas-container {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+    .glass-card {
+      background: rgba(10, 18, 38, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(253, 224, 71, 0.18);
+      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45);
+    }
+    .glass-card-subtle {
+      background: rgba(14, 23, 42, 0.5);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    /* Vinyl record spin styling */
+    .vinyl-disc {
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8), inset 0 0 10px rgba(0,0,0,0.9);
+      transition: transform 0.1s linear;
+    }
+    .spinning {
+      animation: spinRecord 3.6s linear infinite;
+    }
+    @keyframes spinRecord {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    .tonearm {
+      transform-origin: 20px 20px;
+      transition: transform 0.75s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .tonearm-playing {
+      transform: rotate(26deg);
+    }
+    /* Custom Range slider */
+    input[type=range] {
+      accent-color: #eab308;
+    }
+    /* Hide scrollbar */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="relative w-screen h-screen">
+
+  <div id="canvas-container"></div>
+
+  <!-- Top Navigation & Title Bar -->
+  <header class="absolute top-0 left-0 w-full p-4 md:p-6 z-20 flex justify-between items-center pointer-events-none">
+    <div class="pointer-events-auto flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-indigo-600 flex items-center justify-center p-0.5 shadow-lg shadow-amber-500/20">
+        <div class="w-full h-full bg-[#0a1228] rounded-full flex items-center justify-center">
+          <!-- Moon & Star SVG Icon -->
+          <svg class="w-5 h-5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>
+            <path d="M19 3v4M21 5h-4" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+        </div>
+      </div>
+      <div>
+        <h1 class="font-cinzel text-base md:text-xl font-bold tracking-wider text-amber-100 flex items-center gap-2">
+          Starry Night <span class="text-xs md:text-sm font-normal text-amber-400/80 px-2 py-0.5 rounded-full border border-amber-400/20 bg-amber-950/30">& The Little Fox</span>
+        </h1>
+        <p class="text-xs text-indigo-200/60 hidden sm:block">Inspired by Vincent van Gogh &bull; 3D Impasto Cosmos & Lavender Breeze</p>
+      </div>
+    </div>
+
+    <!-- Top Right Actions -->
+    <div class="pointer-events-auto flex items-center space-x-2">
+      <!-- Quick instructions tooltip -->
+      <div class="hidden md:flex items-center text-xs text-amber-200/70 glass-card-subtle px-3 py-1.5 rounded-full gap-2 border border-amber-400/20">
+        <svg class="w-3.5 h-3.5 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        <span>Drag to look around &bull; Scroll to zoom</span>
+      </div>
+
+      <!-- Scene Presets Button -->
+      <button id="btn-camera-reset" title="Recenter View" class="p-2.5 rounded-full glass-card hover:bg-slate-800/80 text-amber-200 border border-amber-400/30 transition transform hover:scale-105 active:scale-95 shadow-md">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </button>
+
+      <button id="btn-toggle-panel" title="Atmospheric Controls" class="px-3.5 py-2 rounded-full glass-card hover:bg-slate-800/80 text-amber-200 border border-amber-400/30 text-xs font-medium flex items-center gap-1.5 transition transform hover:scale-105">
+        <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+        <span class="hidden sm:inline">Settings</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Collapsible Environment Controls Drawer -->
+  <div id="settings-drawer" class="absolute right-4 top-20 z-20 w-72 glass-card rounded-2xl p-4 transition-all duration-300 transform opacity-0 translate-y-[-10px] pointer-events-none">
+    <div class="flex justify-between items-center pb-2.5 mb-3 border-b border-indigo-400/15">
+      <span class="text-xs uppercase tracking-wider font-semibold text-amber-300">Impasto Atmosphere</span>
+      <button id="btn-close-settings" class="text-slate-400 hover:text-white">
+        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    
+    <div class="space-y-3.5 text-xs">
+      <div>
+        <div class="flex justify-between text-indigo-200 mb-1">
+          <span>Sky Swirl Speed</span>
+          <span id="label-swirl-speed" class="text-amber-300 font-mono">1.0x</span>
+        </div>
+        <input id="slider-swirl" type="range" min="0.2" max="3.0" step="0.1" value="1.0" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+      </div>
+
+      <div>
+        <div class="flex justify-between text-indigo-200 mb-1">
+          <span>Night Wind & Lavender Sway</span>
+          <span id="label-wind-speed" class="text-amber-300 font-mono">Normal</span>
+        </div>
+        <input id="slider-wind" type="range" min="0.3" max="2.5" step="0.1" value="1.0" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+      </div>
+
+      <div>
+        <div class="flex justify-between text-indigo-200 mb-1">
+          <span>Golden Fireflies Count</span>
+          <span id="label-fireflies" class="text-amber-300 font-mono">Active</span>
+        </div>
+        <input id="slider-particles" type="range" min="50" max="300" step="10" value="160" class="w-full h-1.5 bg-slate-700 rounded-lg cursor-pointer">
+      </div>
+
+      <div class="pt-2 border-t border-indigo-400/15 flex items-center justify-between">
+        <span class="text-indigo-200">Fox Fox Tail Wag</span>
+        <button id="btn-fox-curious" class="px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/40 text-amber-300 rounded-md border border-amber-500/30 transition text-[11px]">
+          Whistle to Fox 🦊
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Centered-Bottom Vintage Starry Night Vinyl Player -->
+  <div class="absolute bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-20 w-[92%] sm:w-[480px] max-w-lg">
+    <div class="glass-card rounded-3xl p-3.5 sm:p-4 border border-amber-400/30 shadow-2xl relative overflow-hidden backdrop-blur-xl">
+      <!-- Glow effect behind player -->
+      <div class="absolute -top-12 -left-12 w-36 h-36 bg-amber-500/15 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-10 -right-10 w-36 h-36 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="flex items-center gap-4 relative z-10">
+        
+        <!-- Turntable Deck & Vinyl Disc Representation -->
+        <div class="relative w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-neutral-900/90 rounded-2xl p-1.5 shadow-inner border border-amber-900/40 flex items-center justify-center">
+          
+          <!-- Vinyl Disc -->
+          <div id="vinyl-disc" class="vinyl-disc w-full h-full rounded-full bg-gradient-to-tr from-[#111113] via-[#1c1c20] to-[#0a0a0c] relative flex items-center justify-center cursor-pointer border border-neutral-700/60 overflow-hidden">
+            <!-- Concentric Groove Rings -->
+            <div class="absolute inset-1.5 rounded-full border border-neutral-700/30"></div>
+            <div class="absolute inset-3.5 rounded-full border border-neutral-700/25"></div>
+            <div class="absolute inset-5 rounded-full border border-neutral-700/20"></div>
+            <div class="absolute inset-7 rounded-full border border-neutral-700/20"></div>
+
+            <!-- Vincent Starry Night Center Artwork Stamp -->
+            <div class="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden border-2 border-amber-400/60 shadow-lg relative flex items-center justify-center">
+              <svg viewBox="0 0 100 100" class="w-full h-full transform scale-110">
+                <defs>
+                  <radialGradient id="starryVortex" cx="50%" cy="50%" r="50%">
+                    <stop offset="0%" stop-color="#fef08a"/>
+                    <stop offset="35%" stop-color="#f59e0b"/>
+                    <stop offset="70%" stop-color="#2563eb"/>
+                    <stop offset="100%" stop-color="#0f172a"/>
+                  </radialGradient>
+                </defs>
+                <rect width="100" height="100" fill="#0b1b3a"/>
+                <circle cx="50" cy="50" r="46" fill="url(#starryVortex)" opacity="0.85"/>
+                <path d="M20,50 Q45,25 70,50 T95,50" stroke="#fef08a" stroke-width="4" fill="none" opacity="0.8"/>
+                <path d="M10,65 Q40,40 80,60" stroke="#60a5fa" stroke-width="5" fill="none" opacity="0.7"/>
+                <circle cx="68" cy="30" r="10" fill="#fde047"/>
+                <circle cx="72" cy="28" r="8" fill="#0b1b3a"/>
+              </svg>
+              <!-- Center Spindle Hole -->
+              <div class="absolute w-2 h-2 rounded-full bg-slate-900 border border-amber-200"></div>
+            </div>
+          </div>
+
+          <!-- Vintage Tone-Arm -->
+          <div class="absolute top-1 right-2 pointer-events-none">
+            <svg id="tonearm-svg" class="w-8 h-16 tonearm" viewBox="0 0 40 80" fill="none">
+              <!-- Pivot -->
+              <circle cx="20" cy="15" r="7" fill="#475569" stroke="#cbd5e1" stroke-width="1.5"/>
+              <circle cx="20" cy="15" r="2.5" fill="#f59e0b"/>
+              <!-- Arm Rod -->
+              <path d="M20,15 L17,55 L24,68" stroke="#cbd5e1" stroke-width="2.2" stroke-linecap="round"/>
+              <!-- Cartridge headshell -->
+              <rect x="20" y="66" width="6" height="10" rx="1.5" transform="rotate(25 23 71)" fill="#d97706" stroke="#fef08a" stroke-width="1"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Track Info & Controls -->
+        <div class="flex-1 min-w-0 pr-1">
+          <div class="flex items-center justify-between">
+            <div class="truncate">
+              <h2 class="text-xs sm:text-sm font-bold text-amber-200 truncate font-cinzel">Starry Nocturne (Op. 1889)</h2>
+              <p class="text-[11px] text-indigo-200/70 truncate flex items-center gap-1.5 mt-0.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                Lo-Fi Impasto Dream &bull; Acoustic Music Box
+              </p>
+            </div>
+            
+            <!-- Ambient sound toggle badge -->
+            <button id="btn-ambient-toggle" title="Toggle night crickets and breeze" class="p-1.5 rounded-lg border border-amber-400/20 bg-indigo-950/40 hover:bg-amber-950/40 text-amber-300 transition text-[11px] flex items-center gap-1">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M2 10s3-3 5-1c3 3 5-1 7 1s4 4 8 0"/>
+                <path d="M4 14s2-2 4 0c2 2 4-1 6 0s3 2 6 0"/>
+              </svg>
+              <span class="hidden sm:inline text-[10px]">Crickets</span>
+            </button>
+          </div>
+
+          <!-- Playback progress bar (interactive visual) -->
+          <div class="mt-2.5">
+            <div class="w-full bg-slate-800/80 h-1.5 rounded-full overflow-hidden cursor-pointer relative" id="progress-container">
+              <div id="progress-bar" class="bg-gradient-to-r from-amber-400 to-yellow-200 h-full w-0 rounded-full transition-all duration-300"></div>
+            </div>
+            <div class="flex justify-between text-[10px] text-indigo-300/60 font-mono mt-1">
+              <span id="time-current">0:00</span>
+              <span id="playback-status" class="text-amber-300/80 italic font-sans text-[10px]">Click play to spin</span>
+              <span id="time-total">3:42</span>
+            </div>
+          </div>
+
+          <!-- Bottom Control Bar -->
+          <div class="flex items-center justify-between mt-2 pt-1 border-t border-indigo-400/10">
+            <!-- Volume slider -->
+            <div class="flex items-center space-x-1.5 w-24">
+              <svg class="w-3.5 h-3.5 text-indigo-300/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>
+              </svg>
+              <input id="slider-volume" type="range" min="0" max="1" step="0.05" value="0.75" class="w-full h-1 bg-slate-700 rounded-lg cursor-pointer">
+            </div>
+
+            <!-- Primary Play Button -->
+            <div class="flex items-center space-x-3">
+              <button id="btn-play" class="w-10 h-10 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/30 hover:scale-105 active:scale-95 transition">
+                <!-- Play Icon -->
+                <svg id="icon-play" class="w-5 h-5 translate-x-0.5" viewBox="0 0 24 24" fill="currentColor">
+                  <polygon points="5 3 19 12 5 21 5 3"/>
+                </svg>
+                <!-- Pause Icon (hidden by default) -->
+                <svg id="icon-pause" class="w-5 h-5 hidden" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="6" y="4" width="4" height="16" rx="1"/>
+                  <rect x="14" y="4" width="4" height="16" rx="1"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* =========================================================================
+       1. WEB AUDIO API SYNTHESIZER (Dreamy Post-Impressionist Melody & Ambience)
+       ========================================================================= */
+    class StarryAudioPlayer {
+      constructor() {
+        this.ctx = null;
+        this.isPlaying = false;
+        this.masterVolume = 0.75;
+        this.ambientCrircketsActive = true;
+        this.ambientGain = null;
+        this.musicGain = null;
+        this.timer = null;
+        this.currentStep = 0;
+        this.currentTimeSec = 0;
+        this.totalDuration = 222; // 3m 42s
+
+        // Romantic pentatonic chord progression evoking van Gogh's Vincent / Starry theme
+        // Frequencies in Hz for gentle Music Box / Celesta / Warm Rhodes tones
+        this.melodyNotes = [
+          // Bar 1 (E minor / Starry night sky)
+          659.25, 783.99, 987.77, 1174.66, 987.77, 783.99, 
+          // Bar 2 (C Major 7 / Golden moon glow)
+          523.25, 659.25, 783.99, 987.77, 783.99, 659.25,
+          // Bar 3 (G Major / Rolling Lavender hills)
+          392.00, 493.88, 587.33, 783.99, 587.33, 493.88,
+          // Bar 4 (D Major / Fox gazing into cosmos)
+          587.33, 739.99, 880.00, 1108.73, 880.00, 739.99,
+          // Bar 5 (B minor gentle arpeggios)
+          493.88, 587.33, 739.99, 987.77, 739.99, 587.33,
+          // Bar 6 (A minor 9)
+          440.00, 523.25, 659.25, 880.00, 659.25, 523.25
+        ];
+
+        this.bassNotes = [
+          164.81, 130.81, 98.00, 146.83, 123.47, 110.00
+        ];
+      }
+
+      initContext() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+
+          // Master bus
+          this.masterGain = this.ctx.createGain();
+          this.masterGain.gain.setValueAtTime(this.masterVolume, this.ctx.currentTime);
+          this.masterGain.connect(this.ctx.destination);
+
+          // Music bus
+          this.musicGain = this.ctx.createGain();
+          this.musicGain.gain.setValueAtTime(0.85, this.ctx.currentTime);
+          this.musicGain.connect(this.masterGain);
+
+          // Ambient bus (crickets & wind whisper)
+          this.ambientGain = this.ctx.createGain();
+          this.ambientGain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+          this.ambientGain.connect(this.masterGain);
+
+          this.startAmbientSound();
+        } else if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playPluck(freq, time, duration = 1.4, isBass = false) {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const osc2 = this.ctx.createOscillator();
+        const gainNode = this.ctx.createGain();
+        const filter = this.ctx.createBiquadFilter();
+
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(isBass ? 450 : 2200, time);
+        filter.Q.setValueAtTime(2.5, time);
+
+        osc.type = isBass ? 'triangle' : 'sine';
+        osc2.type = 'triangle';
+
+        osc.frequency.setValueAtTime(freq, time);
+        osc2.frequency.setValueAtTime(freq * 1.002, time); // Subtle warm chorus detune
+
+        const initialVol = isBass ? 0.35 : 0.22;
+        gainNode.gain.setValueAtTime(0.0001, time);
+        gainNode.gain.exponentialRampToValueAtTime(initialVol, time + 0.035);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+        osc.connect(filter);
+        osc2.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(this.musicGain);
+
+        osc.start(time);
+        osc2.start(time);
+        osc.stop(time + duration + 0.1);
+        osc2.stop(time + duration + 0.1);
+      }
+
+      startAmbientSound() {
+        // High soft filtered noise simulating gentle night breeze and distant night meadow
+        const bufferSize = this.ctx.sampleRate * 2;
+        const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+
+        const whiteNoise = this.ctx.createBufferSource();
+        whiteNoise.buffer = noiseBuffer;
+        whiteNoise.loop = true;
+
+        const bandpass = this.ctx.createBiquadFilter();
+        bandpass.type = 'bandpass';
+        bandpass.frequency.value = 450;
+        bandpass.Q.value = 3.0;
+
+        whiteNoise.connect(bandpass);
+        bandpass.connect(this.ambientGain);
+        whiteNoise.start();
+
+        // Procedural soft cricket chirp interval
+        setInterval(() => {
+          if (this.ambientCrircketsActive && this.ctx && this.ctx.state === 'running') {
+            this.chirpCricket();
+          }
+        }, 3200);
+      }
+
+      chirpCricket() {
+        if (!this.ctx || !this.ambientCrircketsActive) return;
+        const now = this.ctx.currentTime;
+        for (let i = 0; i < 3; i++) {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(4600 + Math.random() * 200, now + i * 0.08);
+          gain.gain.setValueAtTime(0.0001, now + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.03, now + i * 0.08 + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.0001, now + i * 0.08 + 0.05);
+
+          osc.connect(gain);
+          gain.connect(this.ambientGain);
+          osc.start(now + i * 0.08);
+          osc.stop(now + i * 0.08 + 0.06);
+        }
+      }
+
+      play() {
+        this.initContext();
+        this.isPlaying = true;
+        this.scheduleNotes();
+      }
+
+      pause() {
+        this.isPlaying = false;
+        if (this.timer) {
+          clearTimeout(this.timer);
+          this.timer = null;
+        }
+      }
+
+      scheduleNotes() {
+        if (!this.isPlaying) return;
+
+        const stepDuration = 0.42; // Tempo in seconds per note
+        const now = this.ctx.currentTime;
+
+        // Schedule melody note
+        const noteFreq = this.melodyNotes[this.currentStep % this.melodyNotes.length];
+        this.playPluck(noteFreq, now, 1.2, false);
+
+        // Schedule Bass note on downbeats
+        if (this.currentStep % 6 === 0) {
+          const bassIdx = Math.floor((this.currentStep / 6) % this.bassNotes.length);
+          this.playPluck(this.bassNotes[bassIdx], now, 2.2, true);
+        }
+
+        this.currentStep++;
+        this.currentTimeSec = (this.currentTimeSec + stepDuration) % this.totalDuration;
+        
+        // Update UI Progress bar
+        updatePlayerTimeUI(this.currentTimeSec, this.totalDuration);
+
+        this.timer = setTimeout(() => {
+          this.scheduleNotes();
+        }, stepDuration * 1000);
+      }
+
+      setVolume(val) {
+        this.masterVolume = val;
+        if (this.masterGain && this.ctx) {
+          this.masterGain.gain.setValueAtTime(val, this.ctx.currentTime);
+        }
+      }
+
+      toggleAmbient() {
+        this.ambientCrircketsActive = !this.ambientCrircketsActive;
+        if (this.ambientGain && this.ctx) {
+          this.ambientGain.gain.setValueAtTime(this.ambientCrircketsActive ? 0.2 : 0.0001, this.ctx.currentTime);
+        }
+        return this.ambientCrircketsActive;
+      }
+    }
+
+    const starryAudio = new StarryAudioPlayer();
+
+    function formatTime(seconds) {
+      const min = Math.floor(seconds / 60);
+      const sec = Math.floor(seconds % 60);
+      return `${min}:${sec < 10 ? '0' : ''}${sec}`;
+    }
+
+    function updatePlayerTimeUI(current, total) {
+      const bar = document.getElementById('progress-bar');
+      const timeCur = document.getElementById('time-current');
+      if (bar) {
+        bar.style.width = `${(current / total) * 100}%`;
+      }
+      if (timeCur) {
+        timeCur.innerText = formatTime(current);
+      }
+    }
+
+    /* =========================================================================
+       2. THREE.JS SCENE, SHADERS, PROCEDURAL FOX & LAVENDER FIELD
+       ========================================================================= */
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x0a1428, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 1000);
+    // Position camera so upper 2/3 shows starry sky, lower 1/3 focuses on the Fox & Lavender
+    camera.position.set(0, 3.2, 10.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.1;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.maxPolarAngle = Math.PI / 2 + 0.02; // Prevent going under the terrain
+    controls.minDistance = 4;
+    controls.maxDistance = 22;
+    controls.target.set(0, 1.8, 0);
+
+    // Van Gogh Swirling Sky Shader Dome
+    const starrySkyVertexShader = `
+      varying vec2 vUv;
+      varying vec3 vWorldPosition;
+      void main() {
+        vUv = uv;
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPosition = worldPosition.xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+
+    const starrySkyFragmentShader = `
+      uniform float uTime;
+      uniform float uSwirlSpeed;
+      varying vec2 vUv;
+      varying vec3 vWorldPosition;
+
+      // 2D Rotation
+      mat2 rot(float a) {
+        float s = sin(a);
+        float c = cos(a);
+        return mat2(c, -s, s, c);
+      }
+
+      // Simplex-like noise helper
+      vec3 hash33(vec3 p3) {
+        p3 = fract(p3 * vec3(.1031, .1030, .0973));
+        p3 += dot(p3, p3.yxz + 33.33);
+        return fract((p3.xxy + p3.yxx) * p3.zyx);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        vec2 u = f*f*(3.0-2.0*f);
+        float a = sin(dot(i + vec2(0.0,0.0), vec2(12.9898, 78.233))) * 43758.5453;
+        float b = sin(dot(i + vec2(1.0,0.0), vec2(12.9898, 78.233))) * 43758.5453;
+        float c = sin(dot(i + vec2(0.0,1.0), vec2(12.9898, 78.233))) * 43758.5453;
+        float d = sin(dot(i + vec2(1.0,1.0), vec2(12.9898, 78.233))) * 43758.5453;
+        return mix(mix(fract(a), fract(b), u.x), mix(fract(c), fract(d), u.x), u.y);
+      }
+
+      // Impasto directional stroke texture
+      float impastoStrokes(vec2 uv, float angle) {
+        vec2 su = rot(angle) * uv * vec2(120.0, 16.0);
+        return sin(su.x + noise(su * 0.2) * 5.0) * 0.5 + 0.5;
+      }
+
+      void main() {
+        vec2 uv = vUv;
+        float time = uTime * 0.15 * uSwirlSpeed;
+
+        // Ultramarine & Prussian Blue palette matching original painting
+        vec3 deepBlue   = vec3(0.03, 0.07, 0.22);
+        vec3 cobaltBlue = vec3(0.09, 0.22, 0.54);
+        vec3 cyanVortex = vec3(0.18, 0.48, 0.72);
+        vec3 goldenGlow = vec3(0.98, 0.82, 0.31);
+        vec3 warmWhite  = vec3(1.0, 0.96, 0.85);
+
+        // Center swirl coordinates
+        vec2 swirlCenter1 = vec2(0.48, 0.65);
+        vec2 d1 = uv - swirlCenter1;
+        float dist1 = length(d1);
+        float angle1 = atan(d1.y, d1.x);
+
+        // Dynamic vortex warping
+        float spiral1 = sin(dist1 * 26.0 - angle1 * 3.5 - time * 2.2);
+        float spiral2 = cos(dist1 * 18.0 + angle1 * 2.0 + time * 1.5);
+        float flow = noise(uv * 7.0 + vec2(time * 0.5, sin(uv.x * 4.0)));
+
+        // Van Gogh visible brushstroke flow lines
+        float stroke = impastoStrokes(uv, angle1 + 1.57);
+        stroke = mix(stroke, impastoStrokes(uv, -0.6), 0.5);
+
+        // Star 1: Great Luminous Crescent Moon (top right)
+        vec2 moonPos = vec2(0.78, 0.75);
+        float dMoon = length((uv - moonPos) * vec2(1.0, 1.4));
+        float moonHalo = exp(-dMoon * 9.0) * 1.8;
+        float moonRings = sin(dMoon * 45.0 - time * 1.2) * 0.5 + 0.5;
+        float moonDisc = smoothstep(0.065, 0.058, dMoon);
+        // Cut out crescent shape
+        float moonCutter = smoothstep(0.062, 0.055, length((uv - (moonPos + vec2(0.02, 0.015))) * vec2(1.0, 1.4)));
+        float crescent = clamp(moonDisc - moonCutter * 0.95, 0.0, 1.0);
+
+        // Pulsing Van Gogh swirling stars
+        vec2 starA = vec2(0.24, 0.78);
+        vec2 starB = vec2(0.38, 0.55);
+        vec2 starC = vec2(0.60, 0.82);
+        vec2 starD = vec2(0.12, 0.60);
+
+        float dStarA = length(uv - starA);
+        float dStarB = length(uv - starB);
+        float dStarC = length(uv - starC);
+        float dStarD = length(uv - starD);
+
+        float starsHalo = exp(-dStarA * 22.0) * (sin(time * 3.0) * 0.25 + 0.95)
+                        + exp(-dStarB * 24.0) * (cos(time * 2.5) * 0.25 + 0.95)
+                        + exp(-dStarC * 20.0) * (sin(time * 4.0) * 0.2 + 0.9)
+                        + exp(-dStarD * 28.0) * 0.9;
+
+        // Base gradient from deep midnight bottom to swirling top
+        vec3 col = mix(deepBlue, cobaltBlue, uv.y * 1.2);
+        
+        // Add swirling impasto stream
+        float swirlBand = smoothstep(0.1, 0.7, spiral1 * 0.5 + 0.5 + flow * 0.3);
+        col = mix(col, cyanVortex, swirlBand * 0.65);
+
+        // Apply distinct rhythmic brush marks
+        col += (stroke - 0.5) * 0.14 * (cyanVortex + goldenGlow * 0.3);
+
+        // Add star halos and golden moon rings
+        col += goldenGlow * (starsHalo * 1.2);
+        col += mix(goldenGlow, warmWhite, 0.6) * (moonHalo + moonRings * exp(-dMoon * 12.0) * 0.8);
+        col += warmWhite * crescent * 2.5;
+
+        // Horizon blending softly with distant lavender mist
+        float horizonFade = smoothstep(0.0, 0.25, uv.y);
+        col = mix(vec3(0.04, 0.08, 0.18), col, horizonFade);
+
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `;
+
+    const skyGeo = new THREE.SphereGeometry(180, 48, 36);
+    // Invert geometry so shader faces inward
+    skyGeo.scale(-1, 1, 1);
+
+    const skyUniforms = {
+      uTime: { value: 0 },
+      uSwirlSpeed: { value: 1.0 }
+    };
+
+    const skyMat = new THREE.ShaderMaterial({
+      vertexShader: starrySkyVertexShader,
+      fragmentShader: starrySkyFragmentShader,
+      uniforms: skyUniforms,
+      side: THREE.BackSide,
+      depthWrite: false
+    });
+
+    const skyDome = new THREE.Mesh(skyGeo, skyMat);
+    skyDome.rotation.y = -Math.PI / 4;
+    scene.add(skyDome);
+
+    // Golden Moon and Starry Nocturne Lighting
+    const moonLight = new THREE.DirectionalLight(0xfef08a, 1.8);
+    moonLight.position.set(25, 35, -15);
+    moonLight.castShadow = true;
+    moonLight.shadow.mapSize.width = 2048;
+    moonLight.shadow.mapSize.height = 2048;
+    moonLight.shadow.camera.near = 0.5;
+    moonLight.shadow.camera.far = 100;
+    moonLight.shadow.bias = -0.001;
+    scene.add(moonLight);
+
+    const ambientLight = new THREE.AmbientLight(0x1e295d, 1.2);
+    scene.add(ambientLight);
+
+    const rimLight = new THREE.PointLight(0x60a5fa, 2.2, 20);
+    rimLight.position.set(-6, 8, 4);
+    scene.add(rimLight);
+
+    // Warm lantern glow near the fox
+    const foxGazeGlow = new THREE.PointLight(0xfbbf24, 0.8, 6);
+    foxGazeGlow.position.set(0, 2.5, 1.2);
+    scene.add(foxGazeGlow);
+
+    // Terrain: Rolling Hill with Van Gogh Impressionist Palette
+    const hillGeo = new THREE.PlaneGeometry(80, 80, 100, 100);
+    hillGeo.rotateX(-Math.PI / 2);
+    const posAttr = hillGeo.attributes.position;
+    for (let i = 0; i < posAttr.count; i++) {
+      const x = posAttr.getX(i);
+      const z = posAttr.getZ(i);
+      // Gentle undulating mound where the Fox rests comfortably
+      const y = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 1.4 - Math.hypot(x, z) * 0.035;
+      posAttr.setY(i, y);
+    }
+    hillGeo.computeVertexNormals();
+
+    const hillMat = new THREE.MeshStandardMaterial({
+      color: 0x0f1c30,
+      roughness: 0.85,
+      metalness: 0.1,
+      flatShading: true
+    });
+    const hillMesh = new THREE.Mesh(hillGeo, hillMat);
+    hillMesh.position.y = -0.5;
+    hillMesh.receiveShadow = true;
+    scene.add(hillMesh);
+
+    // 3D Red Fox Group
+    const foxGroup = new THREE.Group();
+    scene.add(foxGroup);
+    foxGroup.position.set(0, 0.15, 0.4);
+
+    // Palettes for Fox
+    const furOrange = new THREE.MeshStandardMaterial({ color: 0xdf5922, roughness: 0.55, metalness: 0.05 });
+    const furWhite  = new THREE.MeshStandardMaterial({ color: 0xf3f4f6, roughness: 0.7, metalness: 0.05 });
+    const darkCharcoal = new THREE.MeshStandardMaterial({ color: 0x1f242d, roughness: 0.6 });
+    const foxEyeMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.1, metalness: 0.9 });
+    const eyeGlowMat = new THREE.MeshBasicMaterial({ color: 0xfde047 });
+
+    // Fox Body (Rounded sitting posture)
+    const bodyGeo = new THREE.SphereGeometry(0.72, 18, 16);
+    bodyGeo.scale(0.85, 1.15, 0.95);
+    const bodyMesh = new THREE.Mesh(bodyGeo, furOrange);
+    bodyMesh.position.set(0, 0.8, 0);
+    bodyMesh.castShadow = true;
+    foxGroup.add(bodyMesh);
+
+    // Fox White Chest / Bib
+    const chestGeo = new THREE.SphereGeometry(0.48, 14, 14);
+    chestGeo.scale(0.65, 1.0, 0.5);
+    const chestMesh = new THREE.Mesh(chestGeo, furWhite);
+    chestMesh.position.set(0, 0.75, 0.45);
+    foxGroup.add(chestMesh);
+
+    // Fox Head Pivot (Tilted up, gazing into Starry Night Sky)
+    const headPivot = new THREE.Group();
+    headPivot.position.set(0, 1.5, 0.15);
+    foxGroup.add(headPivot);
+
+    // Tilt head up towards the stars (~32 degrees upwards)
+    headPivot.rotation.x = -0.48;
+    headPivot.rotation.y = 0.12;
+
+    const headGeo = new THREE.ConeGeometry(0.55, 0.8, 16);
+    headGeo.rotateX(Math.PI / 2);
+    headGeo.scale(1.0, 0.8, 0.9);
+    const headMesh = new THREE.Mesh(headGeo, furOrange);
+    headMesh.castShadow = true;
+    headPivot.add(headMesh);
+
+    // Snout / Muzzle
+    const snoutGeo = new THREE.ConeGeometry(0.24, 0.55, 12);
+    snoutGeo.rotateX(Math.PI / 2);
+    const snoutMesh = new THREE.Mesh(snoutGeo, furWhite);
+    snoutMesh.position.set(0, -0.06, 0.45);
+    snoutMesh.castShadow = true;
+    headPivot.add(snoutMesh);
+
+    // Black Nose Tip
+    const noseGeo = new THREE.SphereGeometry(0.07, 8, 8);
+    const noseMesh = new THREE.Mesh(noseGeo, darkCharcoal);
+    noseMesh.position.set(0, 0.05, 0.72);
+    headPivot.add(noseMesh);
+
+    // Fox Ears (Left & Right)
+    function createEar(isLeft = true) {
+      const earG = new THREE.Group();
+      const earGeo = new THREE.ConeGeometry(0.24, 0.52, 6);
+      earGeo.scale(0.8, 1.0, 0.3);
+      const outerEar = new THREE.Mesh(earGeo, furOrange);
+      outerEar.castShadow = true;
+      earG.add(outerEar);
+
+      const innerEarGeo = new THREE.ConeGeometry(0.15, 0.38, 5);
+      innerEarGeo.scale(0.7, 1.0, 0.2);
+      const innerEar = new THREE.Mesh(innerEarGeo, furWhite);
+      innerEar.position.set(0, -0.04, 0.04);
+      earG.add(innerEar);
+
+      // Black tip on ear
+      const earTipGeo = new THREE.ConeGeometry(0.09, 0.16, 5);
+      earTipGeo.scale(0.8, 1.0, 0.3);
+      const earTip = new THREE.Mesh(earTipGeo, darkCharcoal);
+      earTip.position.set(0, 0.2, 0);
+      earG.add(earTip);
+
+      const sign = isLeft ? -1 : 1;
+      earG.position.set(sign * 0.32, 0.36, -0.08);
+      earG.rotation.z = sign * -0.28;
+      earG.rotation.x = -0.15;
+      return earG;
+    }
+
+    const earL = createEar(true);
+    const earR = createEar(false);
+    headPivot.add(earL);
+    headPivot.add(earR);
+
+    // Curious Fox Eyes (Gazing into the cosmos)
+    function createFoxEye(isLeft = true) {
+      const eyeGroup = new THREE.Group();
+      const eyeSphere = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 10), foxEyeMat);
+      eyeGroup.add(eyeSphere);
+
+      // Starlight reflection in pupil
+      const glint = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 6), eyeGlowMat);
+      glint.position.set(0.02, 0.025, 0.05);
+      eyeGroup.add(glint);
+
+      const sign = isLeft ? -1 : 1;
+      eyeGroup.position.set(sign * 0.23, 0.08, 0.35);
+      return eyeGroup;
+    }
+    headPivot.add(createFoxEye(true));
+    headPivot.add(createFoxEye(false));
+
+    // Fox Paws (Resting gently on the ground)
+    const pawGeo = new THREE.SphereGeometry(0.16, 10, 10);
+    pawGeo.scale(0.85, 0.6, 1.2);
+    const pawL = new THREE.Mesh(pawGeo, darkCharcoal);
+    pawL.position.set(-0.3, 0.1, 0.55);
+    pawL.castShadow = true;
+    foxGroup.add(pawL);
+
+    const pawR = new THREE.Mesh(pawGeo, darkCharcoal);
+    pawR.position.set(0.3, 0.1, 0.55);
+    pawR.castShadow = true;
+    foxGroup.add(pawR);
+
+    // Multi-Jointed Fluffy Wagging Tail
+    const tailBones = [];
+    let parentJoint = foxGroup;
+    const numTailSegments = 6;
+    for (let i = 0; i < numTailSegments; i++) {
+      const tailJoint = new THREE.Group();
+      const t = i / (numTailSegments - 1);
+      // Segment size curves to a plump center and tapered tip
+      const radius = Math.sin(t * Math.PI) * 0.28 + 0.14;
+      const length = 0.28;
+
+      const segGeo = new THREE.CylinderGeometry(radius * 0.8, radius, length, 10);
+      segGeo.translate(0, length / 2, 0);
+
+      // Tail tip is snowy white
+      const segMat = (i >= numTailSegments - 2) ? furWhite : furOrange;
+      const segMesh = new THREE.Mesh(segGeo, segMat);
+      segMesh.castShadow = true;
+      tailJoint.add(segMesh);
+
+      if (i === 0) {
+        tailJoint.position.set(0.25, 0.3, -0.45);
+        tailJoint.rotation.x = -1.2;
+        tailJoint.rotation.y = 0.4;
+      } else {
+        tailJoint.position.set(0, length, 0);
+        tailJoint.rotation.x = 0.28;
+      }
+
+      parentJoint.add(tailJoint);
+      parentJoint = tailJoint;
+      tailBones.push(tailJoint);
+    }
+
+    // Instanced Lavender Field
+    const lavenderCount = 1800;
+    
+    // Lavender Stalk geometry + Purple Spikes
+    const stalkGeo = new THREE.CylinderGeometry(0.018, 0.024, 1.1, 5);
+    stalkGeo.translate(0, 0.55, 0);
+
+    const lavenderMat = new THREE.MeshStandardMaterial({
+      color: 0x1e3a1e,
+      roughness: 0.8,
+      metalness: 0.1
+    });
+
+    const flowerSpikeGeo = new THREE.ConeGeometry(0.08, 0.65, 5);
+    flowerSpikeGeo.translate(0, 0.85, 0);
+
+    // Dual-tone Van Gogh Purples & Violets
+    const violetMat = new THREE.MeshStandardMaterial({
+      color: 0x8b5cf6, // Deep lavender purple
+      emissive: 0x3b1d60,
+      roughness: 0.6,
+      metalness: 0.15
+    });
+
+    const lavenderInstancedMesh = new THREE.InstancedMesh(flowerSpikeGeo, violetMat, lavenderCount);
+    lavenderInstancedMesh.receiveShadow = true;
+    lavenderInstancedMesh.castShadow = true;
+
+    const dummy = new THREE.Object3D();
+    const lavenderData = [];
+
+    // Distribute lavender around the hill avoiding direct fox footprint
+    let placed = 0;
+    for (let i = 0; i < lavenderCount * 1.6 && placed < lavenderCount; i++) {
+      const radius = 1.0 + Math.sqrt(Math.random()) * 16.0;
+      const angle = Math.random() * Math.PI * 2;
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+
+      // Keep small opening around the fox
+      if (Math.hypot(x, z - 0.4) < 0.95) continue;
+
+      const y = Math.sin(x * 0.08) * Math.cos(z * 0.08) * 1.4 - Math.hypot(x, z) * 0.035 - 0.5;
+
+      const scale = 0.75 + Math.random() * 0.65;
+      dummy.position.set(x, y, z);
+      dummy.scale.set(scale, scale * (0.85 + Math.random() * 0.4), scale);
+      dummy.rotation.y = Math.random() * Math.PI * 2;
+      dummy.rotation.z = (Math.random() - 0.5) * 0.25;
+      dummy.updateMatrix();
+
+      lavenderInstancedMesh.setMatrixAt(placed, dummy.matrix);
+
+      // Varying shades of purple/indigo for Van Gogh richness
+      const toneVariation = Math.random();
+      const col = new THREE.Color();
+      if (toneVariation > 0.6) {
+        col.setHex(0xa78bfa); // Light lilac
+      } else if (toneVariation > 0.3) {
+        col.setHex(0x7c3aed); // Royal violet
+      } else {
+        col.setHex(0x4c1d95); // Deep night indigo
+      }
+      lavenderInstancedMesh.setColorAt(placed, col);
+
+      lavenderData.push({
+        basePos: new THREE.Vector3(x, y, z),
+        baseRot: dummy.rotation.clone(),
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.8 + Math.random() * 0.4,
+        scale: scale
+      });
+
+      placed++;
+    }
+    lavenderInstancedMesh.instanceMatrix.needsUpdate = true;
+    if (lavenderInstancedMesh.instanceColor) lavenderInstancedMesh.instanceColor.needsUpdate = true;
+    scene.add(lavenderInstancedMesh);
+
+    // Golden Glowing Fireflies / Star Particles
+    const fireflyCount = 180;
+    const fireflyGeo = new THREE.BufferGeometry();
+    const fireflyPos = new Float32Array(fireflyCount * 3);
+    const fireflyVel = [];
+
+    for (let i = 0; i < fireflyCount; i++) {
+      fireflyPos[i * 3 + 0] = (Math.random() - 0.5) * 22;
+      fireflyPos[i * 3 + 1] = 0.5 + Math.random() * 6.5;
+      fireflyPos[i * 3 + 2] = (Math.random() - 0.5) * 22;
+
+      fireflyVel.push({
+        x: (Math.random() - 0.5) * 0.015,
+        y: (Math.random() - 0.5) * 0.012,
+        z: (Math.random() - 0.5) * 0.015,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+
+    fireflyGeo.setAttribute('position', new THREE.BufferAttribute(fireflyPos, 3));
+
+    // Custom Canvas Texture for glowing circular stardust
+    const particleCanvas = document.createElement('canvas');
+    particleCanvas.width = 32;
+    particleCanvas.height = 32;
+    const pCtx = particleCanvas.getContext('2d');
+    const grad = pCtx.createRadialGradient(16, 16, 0, 16, 16, 16);
+    grad.addColorStop(0, 'rgba(254, 240, 138, 1)');
+    grad.addColorStop(0.3, 'rgba(245, 158, 11, 0.8)');
+    grad.addColorStop(1, 'rgba(245, 158, 11, 0)');
+    pCtx.fillStyle = grad;
+    pCtx.beginPath();
+    pCtx.arc(16, 16, 16, 0, Math.PI * 2);
+    pCtx.fill();
+
+    const fireflyTex = new THREE.CanvasTexture(particleCanvas);
+
+    const fireflyMat = new THREE.PointsMaterial({
+      size: 0.35,
+      map: fireflyTex,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      color: 0xffea79
+    });
+
+    const firefliesMesh = new THREE.Points(fireflyGeo, fireflyMat);
+    scene.add(firefliesMesh);
+
+    /* =========================================================================
+       3. INTERACTIVE CONTROLS & ANIMATION LOOP
+       ========================================================================= */
+    let swirlSpeedMultiplier = 1.0;
+    let windSpeedMultiplier = 1.0;
+    let whistleTime = 0;
+
+    // UI Elements
+    const vinylDisc = document.getElementById('vinyl-disc');
+    const tonearm = document.getElementById('tonearm-svg');
+    const btnPlay = document.getElementById('btn-play');
+    const iconPlay = document.getElementById('icon-play');
+    const iconPause = document.getElementById('icon-pause');
+    const playbackStatus = document.getElementById('playback-status');
+    const sliderVol = document.getElementById('slider-volume');
+    const btnAmbient = document.getElementById('btn-ambient-toggle');
+    const btnToggleSettings = document.getElementById('btn-toggle-panel');
+    const btnCloseSettings = document.getElementById('btn-close-settings');
+    const settingsDrawer = document.getElementById('settings-drawer');
+    const sliderSwirl = document.getElementById('slider-swirl');
+    const sliderWind = document.getElementById('slider-wind');
+    const sliderParticles = document.getElementById('slider-particles');
+    const btnFoxCurious = document.getElementById('btn-fox-curious');
+    const btnResetCam = document.getElementById('btn-camera-reset');
+
+    function togglePlayback() {
+      if (starryAudio.isPlaying) {
+        starryAudio.pause();
+        vinylDisc.classList.remove('spinning');
+        tonearm.classList.remove('tonearm-playing');
+        iconPlay.classList.remove('hidden');
+        iconPause.classList.add('hidden');
+        playbackStatus.innerText = 'Paused';
+      } else {
+        starryAudio.play();
+        vinylDisc.classList.add('spinning');
+        tonearm.classList.add('tonearm-playing');
+        iconPlay.classList.add('hidden');
+        iconPause.classList.remove('hidden');
+        playbackStatus.innerText = 'Spinning melody...';
+      }
+    }
+
+    btnPlay.addEventListener('click', togglePlayback);
+    vinylDisc.addEventListener('click', togglePlayback);
+
+    sliderVol.addEventListener('input', (e) => {
+      starryAudio.setVolume(parseFloat(e.target.value));
+    });
+
+    btnAmbient.addEventListener('click', () => {
+      const active = starryAudio.toggleAmbient();
+      btnAmbient.classList.toggle('text-amber-300', active);
+      btnAmbient.classList.toggle('text-slate-400', !active);
+    });
+
+    // Toggle Settings drawer
+    btnToggleSettings.addEventListener('click', () => {
+      const isClosed = settingsDrawer.classList.contains('opacity-0');
+      if (isClosed) {
+        settingsDrawer.classList.remove('opacity-0', 'pointer-events-none', 'translate-y-[-10px]');
+      } else {
+        settingsDrawer.classList.add('opacity-0', 'pointer-events-none', 'translate-y-[-10px]');
+      }
+    });
+
+    btnCloseSettings.addEventListener('click', () => {
+      settingsDrawer.classList.add('opacity-0', 'pointer-events-none', 'translate-y-[-10px]');
+    });
+
+    sliderSwirl.addEventListener('input', (e) => {
+      swirlSpeedMultiplier = parseFloat(e.target.value);
+      document.getElementById('label-swirl-speed').innerText = `${swirlSpeedMultiplier.toFixed(1)}x`;
+    });
+
+    sliderWind.addEventListener('input', (e) => {
+      windSpeedMultiplier = parseFloat(e.target.value);
+      document.getElementById('label-wind-speed').innerText = windSpeedMultiplier > 1.8 ? 'Stormy' : windSpeedMultiplier < 0.6 ? 'Calm' : 'Normal';
+    });
+
+    sliderParticles.addEventListener('input', (e) => {
+      const count = parseInt(e.target.value);
+      fireflyGeo.setDrawRange(0, count);
+    });
+
+    // Whistle to fox: fox perks ears and wags tail vigorously
+    btnFoxCurious.addEventListener('click', () => {
+      whistleTime = 3.5; // active for 3.5 seconds
+      // Sound chime trigger
+      if (starryAudio.ctx) {
+        starryAudio.playPluck(1318.51, starryAudio.ctx.currentTime, 0.8, false);
+      }
+    });
+
+    btnResetCam.addEventListener('click', () => {
+      camera.position.set(0, 3.2, 10.5);
+      controls.target.set(0, 1.8, 0);
+      controls.update();
+    });
+
+    // Parallax interaction with mouse
+    let mouseX = 0;
+    let mouseY = 0;
+    window.addEventListener('mousemove', (e) => {
+      mouseX = (e.clientX / window.innerWidth - 0.5) * 2;
+      mouseY = (e.clientY / window.innerHeight - 0.5) * 2;
+    });
+
+    // Resize handling
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = clock.getDelta();
+      const elapsedTime = clock.getElapsedTime();
+
+      // 1. Update Sky Dome Shader uniforms
+      skyUniforms.uTime.value = elapsedTime;
+      skyUniforms.uSwirlSpeed.value = swirlSpeedMultiplier;
+
+      // 2. Animate Fox Body & Wagging Tail
+      const breath = Math.sin(elapsedTime * 1.8) * 0.02;
+      bodyMesh.scale.y = 1.15 + breath;
+      headPivot.position.y = 1.5 + breath * 0.7;
+
+      // Whistle countdown
+      if (whistleTime > 0) {
+        whistleTime -= delta;
+      }
+      const isCurious = whistleTime > 0;
+
+      // Head curiosity tilt
+      const targetTiltY = 0.12 + (isCurious ? Math.sin(elapsedTime * 4.0) * 0.25 : Math.sin(elapsedTime * 0.6) * 0.08);
+      const targetTiltX = -0.48 + (isCurious ? 0.18 : Math.sin(elapsedTime * 0.8) * 0.05);
+      headPivot.rotation.y = THREE.MathUtils.lerp(headPivot.rotation.y, targetTiltY, 0.05);
+      headPivot.rotation.x = THREE.MathUtils.lerp(headPivot.rotation.x, targetTiltX, 0.05);
+
+      // Ear twitches
+      earL.rotation.z = -0.28 + Math.sin(elapsedTime * 3.5) * 0.08 + (isCurious ? 0.15 : 0);
+      earR.rotation.z = 0.28 + Math.cos(elapsedTime * 4.2) * 0.08 - (isCurious ? 0.15 : 0);
+
+      // Multi-joint sinusoidal tail wagging wave
+      const wagSpeed = isCurious ? 14.0 : 4.5;
+      const wagAmplitude = isCurious ? 0.45 : 0.22;
+      for (let j = 0; j < tailBones.length; j++) {
+        const joint = tailBones[j];
+        const delay = j * 0.4;
+        joint.rotation.z = Math.sin(elapsedTime * wagSpeed - delay) * (wagAmplitude * (j + 1) / tailBones.length);
+        joint.rotation.x = (j === 0 ? -1.2 : 0.24) + Math.cos(elapsedTime * 2.0) * 0.04;
+      }
+
+      // 3. Procedural Wind Wave over Lavender Field
+      const windWave = elapsedTime * 2.2 * windSpeedMultiplier;
+      for (let i = 0; i < lavenderData.length; i++) {
+        const item = lavenderData[i];
+        const sway = Math.sin(windWave + item.basePos.x * 0.5 + item.basePos.z * 0.5 + item.phase) * (0.16 * windSpeedMultiplier);
+        
+        dummy.position.copy(item.basePos);
+        dummy.scale.set(item.scale, item.scale, item.scale);
+        dummy.rotation.set(
+          item.baseRot.x + sway * 0.7,
+          item.baseRot.y,
+          item.baseRot.z + sway
+        );
+        dummy.updateMatrix();
+        lavenderInstancedMesh.setMatrixAt(i, dummy.matrix);
+      }
+      lavenderInstancedMesh.instanceMatrix.needsUpdate = true;
+
+      // 4. Floating Fireflies Movement
+      const pAttr = fireflyGeo.attributes.position;
+      for (let i = 0; i < fireflyCount; i++) {
+        const v = fireflyVel[i];
+        let px = pAttr.getX(i) + v.x + Math.sin(elapsedTime + v.phase) * 0.008;
+        let py = pAttr.getY(i) + v.y + Math.cos(elapsedTime * 1.5 + v.phase) * 0.006;
+        let pz = pAttr.getZ(i) + v.z + Math.cos(elapsedTime + v.phase) * 0.008;
+
+        // Boundary wrap
+        if (px > 11) px = -11; if (px < -11) px = 11;
+        if (pz > 11) pz = -11; if (pz < -11) pz = 11;
+        if (py > 7) py = 0.5; if (py < 0.3) py = 6.5;
+
+        pAttr.setXYZ(i, px, py, pz);
+      }
+      pAttr.needsUpdate = true;
+
+      // Subtle parallax camera motion
+      camera.position.x += (mouseX * 0.4 - (camera.position.x - 0)) * 0.02;
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // Start everything seamlessly
+    window.onload = () => {
+      animate();
+    };
+  </script>
+</body>
+</html>
